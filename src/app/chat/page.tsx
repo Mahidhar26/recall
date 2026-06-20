@@ -57,41 +57,61 @@ export default function ChatPage() {
 
   return (
     <div className='flex flex-col h-full'>
-      <div className='p-4 border-b border-gray-200'>
-        <h1 className='text-lg font-semibold'>Ask anything</h1>
+      {/* Header */}
+      <div className='px-6 py-4 border-b border-zinc-200 bg-white'>
+        <h1 className='text-[15px] font-semibold text-zinc-900 tracking-tight'>Ask anything</h1>
+        <p className='text-xs text-zinc-400 mt-0.5'>Answers are grounded in your indexed meetings</p>
       </div>
 
-      <div className='flex-1 overflow-auto p-4 space-y-4'>
+      {/* Messages */}
+      <div className='flex-1 overflow-auto px-6 py-6 space-y-5'>
         {messages.map((m, i) => (
           <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[80%] rounded-lg px-4 py-2 text-sm ${ m.role === 'user' ? 'bg-purple-100 text-purple-900' : 'bg-white border border-gray-200' }`}>
-              <div className='whitespace-pre-wrap'>{m.content || '…'}</div>
-              {m.sources?.length ? (
-                <div className='flex flex-wrap gap-1 mt-2'>
-                  {m.sources.map((s: any, j: number) => (
-                    <span key={j} className='text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded'>
-                      {s.title} · {s.date}
-                    </span>
-                  ))}
+            {m.role === 'assistant' ? (
+              <div className='max-w-[82%] border-l-2 pl-4' style={{ borderColor: '#7C3AED' }}>
+                <div className='text-sm text-zinc-700 leading-relaxed whitespace-pre-wrap'>
+                  {m.content || <span className='text-zinc-300 italic'>Thinking…</span>}
                 </div>
-              ) : null}
-            </div>
+                {m.sources?.length ? (
+                  <div className='flex flex-wrap gap-1.5 mt-3'>
+                    {m.sources.map((s: any, j: number) => (
+                      <span key={j} className='text-[11px] px-2 py-0.5 rounded-full font-medium'
+                        style={{ background: '#F3F0FF', color: '#5B21B6' }}>
+                        {s.title} · {s.date}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <div className='max-w-[82%] px-4 py-2.5 rounded-2xl rounded-tr-sm text-sm leading-relaxed text-white'
+                style={{ background: '#7C3AED' }}>
+                {m.content}
+              </div>
+            )}
           </div>
         ))}
         <div ref={bottomRef} />
       </div>
 
-      <div className='p-4 border-t border-gray-200 flex gap-2'>
+      {/* Input */}
+      <div className='px-6 py-4 border-t border-zinc-200 bg-white flex gap-2'>
         <input
-          className='flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500'
+          className='flex-1 border border-zinc-200 rounded-lg px-4 py-2.5 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:border-violet-400 focus:ring-1 focus:ring-violet-400 bg-zinc-50 disabled:opacity-50 transition-colors'
           placeholder='Ask about any meeting, decision, or action item…'
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && send()}
           disabled={loading}
         />
-        <button onClick={send} disabled={loading}
-          className='px-4 py-2 bg-purple-600 text-white rounded-md text-sm hover:bg-purple-700 disabled:opacity-50'>
+        <button
+          onClick={send}
+          disabled={loading}
+          className='px-5 py-2.5 text-sm font-medium text-white rounded-lg disabled:opacity-40 transition-colors'
+          style={{ background: '#7C3AED' }}
+          onMouseEnter={e => !loading && (e.currentTarget.style.background = '#6D28D9')}
+          onMouseLeave={e => (e.currentTarget.style.background = '#7C3AED')}
+        >
           {loading ? '…' : 'Send'}
         </button>
       </div>
