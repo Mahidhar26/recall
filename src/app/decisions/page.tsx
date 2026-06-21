@@ -25,7 +25,7 @@ export default function DecisionsPage() {
         placeholder='Search decisions or tags…'
         value={search}
         onChange={e => setSearch(e.target.value)}
-        className='w-full border border-zinc-200 rounded-lg px-4 py-2.5 text-sm text-zinc-800 placeholder:text-zinc-400 bg-white mb-6 focus:outline-none focus:border-violet-400 focus:ring-1 focus:ring-violet-400 transition-colors'
+        className='w-full border border-zinc-200 rounded-lg px-4 py-2.5 text-sm text-zinc-800 placeholder:text-zinc-400 bg-white mb-6 focus:outline-none focus:border-[#1D9E75] focus:ring-1 focus:ring-[#1D9E75] transition-colors'
       />
 
       {filtered.length === 0 ? (
@@ -38,7 +38,7 @@ export default function DecisionsPage() {
             <div
               key={d.id}
               className='bg-white rounded-xl border border-zinc-200 p-5 border-l-[3px]'
-              style={{ borderLeftColor: '#059669' }}
+              style={{ borderLeftColor: '#1D9E75' }}
             >
               <div className='text-sm font-semibold text-zinc-800 leading-snug mb-1'>{d.decision}</div>
               {d.rationale && (
@@ -58,7 +58,7 @@ export default function DecisionsPage() {
                   <span
                     key={t}
                     className='text-[11px] px-2 py-0.5 rounded-full font-medium'
-                    style={{ background: '#ECFDF5', color: '#064E3B' }}
+                    style={{ background: '#E7F6F0', color: '#0F5E45' }}
                   >
                     {t}
                   </span>

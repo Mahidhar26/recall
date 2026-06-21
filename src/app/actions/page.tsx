@@ -48,7 +48,7 @@ export default function ActionsPage() {
               onClick={() => setFilter(key)}
               className='px-3 py-1 rounded-md text-xs font-medium transition-colors'
               style={active
-                ? { background: '#7C3AED', color: '#fff' }
+                ? { background: '#534AB7', color: '#fff' }
                 : { background: '#F4F4F5', color: '#71717A' }
               }
             >
@@ -88,7 +88,7 @@ export default function ActionsPage() {
                   <select
                     value={item.status}
                     onChange={e => updateStatus(item.id, e.target.value)}
-                    className='text-xs border border-zinc-200 rounded-md px-2 py-0.5 text-zinc-500 bg-white focus:outline-none focus:border-violet-400'
+                    className='text-xs border border-zinc-200 rounded-md px-2 py-0.5 text-zinc-500 bg-white focus:outline-none focus:border-[#534AB7]'
                   >
                     {STATUSES.map(s => <option key={s} value={s}>{STATUS_STYLE[s].label}</option>)}
                   </select>
