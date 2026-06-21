@@ -3,8 +3,8 @@ import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { Markdown } from '@/components/Markdown'
 import { Toast } from '@/components/Toast'
+import { streamChat, Source } from '@/lib/chat-stream'
 
-interface Source { title: string; date: string; id: string; excerpt: string }
 interface Message { role: 'user' | 'assistant'; content: string; sources?: Source[] }
 type Phase = 'idle' | 'searching' | 'streaming'
 
@@ -74,36 +74,27 @@ export default function ChatPage() {
     setPhase('searching')
 
     try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query }),
-      })
-
-      if (!res.ok) {
-        const errText = await res.text()
-        throw new Error(errText || `HTTP ${res.status}`)
-      }
-
-      const sources = JSON.parse(res.headers.get('X-Sources') ?? '[]')
-      const reader = res.body?.getReader()
-      const decoder = new TextDecoder()
-      let text = ''
+      setMessages(prev => [...prev, { role: 'assistant', content: '', sources: [] }])
       let started = false
 
-      setMessages(prev => [...prev, { role: 'assistant', content: '', sources }])
-
-      while (reader) {
-        const { done, value } = await reader.read()
-        if (done) break
+      const sources = await streamChat(query, chunk => {
         if (!started) { started = true; setPhase('streaming') }
-        text += decoder.decode(value)
         setMessages(prev => {
           const updated = [...prev]
-          updated[updated.length - 1] = { role: 'assistant', content: text, sources }
+          updated[updated.length - 1] = {
+            ...updated[updated.length - 1],
+            content: updated[updated.length - 1].content + chunk,
+          }
           return updated
         })
-      }
+      })
+
+      // Attach sources to the last message
+      setMessages(prev => {
+        const updated = [...prev]
+        updated[updated.length - 1] = { ...updated[updated.length - 1], sources }
+        return updated
+      })
     } catch (err: any) {
       setMessages(prev => [...prev, { role: 'assistant', content: err?.message || 'Something went wrong. Please try again.' }])
     }

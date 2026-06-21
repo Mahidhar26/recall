@@ -1,5 +1,6 @@
 import './globals.css'
 import { Sidebar } from '@/components/Sidebar'
+import { ClientShell } from '@/components/ClientShell'
 
 export const metadata = {
   title: 'Recall — Meeting Memory',
@@ -11,7 +12,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang='en'>
       <body className='flex h-screen' style={{ background: '#FAFAF9' }}>
         <Sidebar />
-        <main className='flex-1 overflow-auto'>{children}</main>
+        <ClientShell>{children}</ClientShell>
       </body>
     </html>
   )
