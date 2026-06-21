@@ -77,7 +77,10 @@ export async function POST(req: NextRequest) {
     headers: {
       'Content-Type': 'text/event-stream',
       'X-Sources': JSON.stringify(chunks.slice(0, 4).map((c: any) => ({
-        title: c.meeting_title, date: c.meeting_date, id: c.meeting_id
+        title: c.meeting_title,
+        date: c.meeting_date,
+        id: c.meeting_id,
+        excerpt: c.content.slice(0, 100).replace(/\s+/g, ' ').trim(),
       }))),
     },
   })
