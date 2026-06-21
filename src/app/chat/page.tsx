@@ -34,6 +34,7 @@ export default function ChatPage() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const [toastVisible, setToastVisible] = useState(false)
+  const [toastKey, setToastKey] = useState(0)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   function handleCopy(answerIndex: number) {
@@ -43,6 +44,7 @@ export default function ChatPage() {
     const text = `Q: ${question?.content ?? ''}\nA: ${plainAnswer}\n\n— via Recall`
     navigator.clipboard.writeText(text)
     if (toastTimer.current) clearTimeout(toastTimer.current)
+    setToastKey(k => k + 1)
     setToastVisible(true)
     toastTimer.current = setTimeout(() => setToastVisible(false), 2000)
   }
@@ -234,7 +236,7 @@ export default function ChatPage() {
           {loading ? '…' : 'Send'}
         </button>
       </div>
-      <Toast message='Copied!' visible={toastVisible} />
+      <Toast message='Copied!' visible={toastVisible} animKey={toastKey} />
     </div>
   )
 }
