@@ -2,14 +2,15 @@
 
 ## Scope
 
-Six independent features implemented together in one plan:
+Five features implemented in this sprint:
 
 1. `vercel.json` — region + timeout config
 2. Upload progress stepper UI
 3. Cross-meeting citation cards in chat
 4. Share answer button with toast
 5. ⌘K global search modal
-6. Weekly digest page (`/digest`)
+
+> **Deferred:** Weekly digest page (`/digest`) — held until external integrations (Notion, Linear, Jira, Teams) are connected so the digest can be auto-generated from real activity streams rather than manually triggered.
 
 ---
 
