@@ -38,32 +38,42 @@ export function parseVtt(raw: string): Chunk[] {
   let currentSpeaker = '', currentText = ''
 
   for (const line of lines) {
-    if (line.includes('-->') || line.match(/^\d+$/) || line.trim() === 'WEBVTT') continue
+    // Skip cue numbers, timestamps, the WEBVTT header, and NOTE metadata lines
+    // (meeting title / attendees) — they carry no speaker and shouldn't pollute
+    // chunk content or embeddings.
+    if (line.includes('-->') || line.match(/^\d+$/) || line.trim() === 'WEBVTT' || line.startsWith('NOTE')) continue
     const match = line.match(/^<v ([^>]+)>(.*)/)
     if (match) {
-      if (currentText) turns.push({ speaker: currentSpeaker, text: currentText.trim() })
+      if (currentText && currentSpeaker) turns.push({ speaker: currentSpeaker, text: currentText.trim() })
       currentSpeaker = match[1]
       currentText = match[2].replace(/<[^>]+>/g, '')
-    } else if (line.trim()) {
+    } else if (line.trim() && currentSpeaker) {
+      // Continuation of the current speaker's turn (multi-line cue text).
       currentText += ' ' + line.trim()
     }
   }
-  if (currentText) turns.push({ speaker: currentSpeaker, text: currentText.trim() })
+  if (currentText && currentSpeaker) turns.push({ speaker: currentSpeaker, text: currentText.trim() })
 
-  // Merge turns into ~400-token chunks, respecting speaker boundaries
+  // Merge consecutive same-speaker turns into ~400-token chunks. A chunk is
+  // flushed when the speaker changes or the size cap is hit, so every chunk has
+  // exactly one speaker — accurate `speaker` column for the People filter and
+  // precise per-speaker search. Content stays clean (callers prepend the name).
   const chunks: Chunk[] = []
   let buffer = '', speaker = '', pos = 0
-  for (const turn of turns) {
-    const line = turn.speaker + ': ' + turn.text
-    if (buffer && (buffer + '\n' + line).length > 1600) {
+  const flush = () => {
+    if (buffer.trim()) {
       chunks.push({ content: buffer.trim(), speaker, position: pos++, tokenCount: Math.ceil(buffer.length / 4) })
-      buffer = line; speaker = turn.speaker
-    } else {
-      buffer = buffer ? buffer + '\n' + line : line
-      if (!speaker) speaker = turn.speaker
     }
+    buffer = ''
   }
-  if (buffer.trim()) chunks.push({ content: buffer.trim(), speaker, position: pos, tokenCount: Math.ceil(buffer.length / 4) })
+  for (const turn of turns) {
+    if (buffer && (turn.speaker !== speaker || (buffer + '\n' + turn.text).length > 1600)) {
+      flush()
+    }
+    if (!buffer) { speaker = turn.speaker; buffer = turn.text }
+    else { buffer += '\n' + turn.text }
+  }
+  flush()
   return chunks
 }
 

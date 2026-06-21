@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { streamChat, Source } from '@/lib/chat-stream'
+import { EMPTY_FILTERS } from '@/lib/chat-filters'
 import { Markdown } from '@/components/Markdown'
 
 export function CmdKModal() {
@@ -39,7 +40,7 @@ export function CmdKModal() {
     if (!q || loading) return
     setAnswer(''); setSources([]); setLoading(true)
     try {
-      const srcs = await streamChat(q, chunk => {
+      const srcs = await streamChat(q, EMPTY_FILTERS, chunk => {
         setAnswer(prev => prev + chunk)
       })
       setSources(srcs)

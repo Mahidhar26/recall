@@ -5,14 +5,17 @@ export interface Source {
   excerpt: string
 }
 
+import type { ChatFilters } from '@/lib/chat-filters'
+
 export async function streamChat(
   query: string,
+  filters: ChatFilters,
   onChunk: (chunk: string) => void
 ): Promise<Source[]> {
   const res = await fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query }),
+    body: JSON.stringify({ query, filters }),
   })
 
   if (!res.ok) throw new Error(await res.text())

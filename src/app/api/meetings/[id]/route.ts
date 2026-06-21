@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { pool } from '@/lib/db'
 import { summarize } from '@/lib/extract'
+import { requireWorkspace } from '@/lib/session'
 
 export async function GET(
   _req: Request,
@@ -9,11 +10,14 @@ export async function GET(
   const { id } = await params
 
   try {
+    const scope = await requireWorkspace()
+    if (!scope) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     const meetingRes = await pool.query(
       `SELECT id, title, source, status,
               TO_CHAR(created_at, 'Mon DD, YYYY') AS created_at
-       FROM meetings WHERE id = $1`,
-      [id]
+       FROM meetings WHERE id = $1 AND workspace_id = $2`,
+      [id, scope.workspaceId]
     )
     if (!meetingRes.rows.length) {
       return NextResponse.json({ error: 'Meeting not found' }, { status: 404 })

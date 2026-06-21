@@ -133,7 +133,7 @@ export default function MeetingDetailPage({ params }: { params: Promise<{ id: st
 
 function BackLink() {
   return (
-    <Link href='/' className='text-sm text-zinc-400 hover:text-zinc-600 transition-colors'>
+    <Link href='/app' className='text-sm text-zinc-400 hover:text-zinc-600 transition-colors'>
       ← Back to overview
     </Link>
   )

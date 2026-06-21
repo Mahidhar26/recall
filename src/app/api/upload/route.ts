@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ingest } from '@/lib/ingest'
+import { requireWorkspace } from '@/lib/session'
 import * as pdfParseModule from 'pdf-parse'
 const pdfParse = (pdfParseModule as any).default ?? pdfParseModule
 
@@ -7,6 +8,9 @@ export const maxDuration = 60  // allow up to 60s for large files
 
 export async function POST(req: NextRequest) {
   try {
+    const scope = await requireWorkspace()
+    if (!scope) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     const form = await req.formData()
     const file = form.get('file') as File
     if (!file) return NextResponse.json({ error: 'No file' }, { status: 400 })
@@ -30,6 +34,7 @@ export async function POST(req: NextRequest) {
       title: file.name.replace(/\.[^.]+$/, ''),
       text,
       source: 'upload',
+      workspaceId: scope.workspaceId,
     })
 
     return NextResponse.json({ success: true, ...result })

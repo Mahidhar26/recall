@@ -2,6 +2,8 @@ import { NextRequest } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { pool } from '@/lib/db'
 import { embed } from '@/lib/embed'
+import { requireWorkspace } from '@/lib/session'
+import { normalizeFilters, filterParams } from '@/lib/chat-filters'
 
 const claude = new Anthropic()
 
@@ -14,13 +16,20 @@ Never invent information. Never say "based on the context".`
 
 export async function POST(req: NextRequest) {
   try {
-  const { query } = await req.json()
+  const scope = await requireWorkspace()
+  if (!scope) return new Response('Unauthorized', { status: 401 })
+
+  const body = await req.json()
+  const query = body.query
   if (!query?.trim()) return new Response('Query required', { status: 400 })
+  const filters = normalizeFilters(body.filters)
 
   // 1. Embed the query
   const queryVec = await embed(query)
 
-  // 2. Vector search — top 8 most similar chunks
+  // 2. Vector search — top 8 most similar chunks within this workspace,
+  //    narrowed by the active filters. Empty filters resolve to NULL and are
+  //    skipped by the `($n IS NULL OR ...)` guards.
   const { rows: chunks } = await pool.query(`
     SELECT c.content, c.speaker,
            m.title AS meeting_title,
@@ -29,15 +38,21 @@ export async function POST(req: NextRequest) {
            1 - (c.embedding <=> $1::vector) AS similarity
     FROM chunks c
     JOIN meetings m ON c.meeting_id = m.id
-    WHERE m.status = 'ready'
+    WHERE m.status = 'ready' AND m.workspace_id = $2
+      AND ($3::date    IS NULL OR m.created_at::date >= $3::date)   -- dateFrom
+      AND ($4::date    IS NULL OR m.created_at::date <= $4::date)   -- dateTo
+      AND ($5::uuid[]  IS NULL OR c.meeting_id = ANY($5))           -- meetingIds
+      AND ($6::text[]  IS NULL OR c.speaker = ANY($6))              -- people
+      AND ($7::text[]  IS NULL OR m.source = ANY($7))               -- sourceTypes
     ORDER BY c.embedding <=> $1::vector
     LIMIT 8
-  `, [JSON.stringify(queryVec)])
+  `, [JSON.stringify(queryVec), scope.workspaceId, ...filterParams(filters)])
 
   if (!chunks.length) {
-    return new Response('No meetings indexed yet. Upload a transcript first.', {
-      headers: { 'Content-Type': 'text/plain' },
-    })
+    const msg = filters.dateFrom || filters.dateTo || filters.meetingIds.length || filters.people.length || filters.sourceTypes.length
+      ? 'No passages match your current filters. Try widening them.'
+      : 'No meetings indexed yet. Upload a transcript first.'
+    return new Response(msg, { headers: { 'Content-Type': 'text/plain' } })
   }
 
   // 3. Build context string

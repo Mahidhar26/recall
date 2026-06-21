@@ -8,6 +8,7 @@ interface IngestInput {
   text: string
   source: 'upload' | 'notion' | 'zoom'
   sourceUrl?: string
+  workspaceId: string
 }
 
 interface IngestResult {
@@ -20,15 +21,19 @@ interface IngestResult {
 export async function ingest(input: IngestInput): Promise<IngestResult> {
   // 1. Create meeting record
   const { rows } = await pool.query(
-    `INSERT INTO meetings (title, source, source_url, status)
-     VALUES ($1, $2, $3, 'processing') RETURNING id`,
-    [input.title, input.source, input.sourceUrl ?? null]
+    `INSERT INTO meetings (title, source, source_url, status, workspace_id)
+     VALUES ($1, $2, $3, 'processing', $4) RETURNING id`,
+    [input.title, input.source, input.sourceUrl ?? null, input.workspaceId]
   )
   const meetingId = rows[0].id
 
   try {
-    // 2. Chunk the text
-    const chunks = chunkText(input.text)
+    // 2. Chunk the text. VTT transcripts (Zoom/Meet/Teams exports) go through
+    //    parseVtt so speaker turns are extracted into chunk.speaker and the
+    //    timestamp/markup is stripped before embedding. Everything else uses the
+    //    plain-text chunker.
+    const isVtt = /^﻿?\s*WEBVTT/.test(input.text)
+    const chunks = isVtt ? parseVtt(input.text) : chunkText(input.text)
     if (chunks.length === 0) throw new Error('No content to index')
 
     // 3. Embed all chunks
