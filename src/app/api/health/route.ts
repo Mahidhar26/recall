@@ -13,8 +13,9 @@ export async function GET() {
       pgvector: ext.rows[0]?.extversion ?? 'NOT INSTALLED',
     })
   } catch (err: any) {
+    console.error('[health] DB error:', err.message, err.code, err.address, err.port)
     return NextResponse.json(
-      { status: 'error', message: err.message },
+      { status: 'error', message: err.message, code: err.code },
       { status: 500 }
     )
   }
