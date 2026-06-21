@@ -1,8 +1,10 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
+import Link from 'next/link'
 import { Markdown } from '@/components/Markdown'
 
-interface Message { role: 'user' | 'assistant'; content: string; sources?: any[] }
+interface Source { title: string; date: string; id: string; excerpt: string }
+interface Message { role: 'user' | 'assistant'; content: string; sources?: Source[] }
 type Phase = 'idle' | 'searching' | 'streaming'
 
 const BOT_NAME = 'Recall'
@@ -120,14 +122,28 @@ export default function ChatPage() {
                   {m.content ? <Markdown content={m.content} /> : <TypingDots />}
                   {m.sources?.length ? (
                     <div className='mt-3 pt-3 border-t border-zinc-100'>
-                      <div className='text-[10px] font-semibold uppercase tracking-widest text-zinc-400 mb-1.5'>Sources</div>
-                      <div className='flex flex-wrap gap-1.5'>
-                        {m.sources.map((s: any, j: number) => (
-                          <span key={j} className='text-[11px] px-2 py-0.5 rounded-full font-medium'
-                            style={{ background: '#F4F3FB', color: '#453C9E' }}>
-                            {s.title} · {s.date}
-                          </span>
+                      <div className='text-[10px] font-semibold uppercase tracking-widest text-zinc-400 mb-2'>Sources</div>
+                      <div className='flex flex-col gap-2'>
+                        {m.sources.slice(0, 3).map((s, j) => (
+                          <Link
+                            key={j}
+                            href={`/meetings/${s.id}`}
+                            className='block rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-2 hover:border-[#534AB7] hover:bg-[#F4F3FB] transition-colors group'
+                          >
+                            <div className='flex items-center justify-between gap-2'>
+                              <span className='text-[12px] font-semibold text-zinc-700 group-hover:text-[#534AB7] transition-colors truncate'>
+                                {s.title}
+                              </span>
+                              <span className='text-[10px] text-zinc-400 shrink-0'>{s.date}</span>
+                            </div>
+                            {s.excerpt && (
+                              <p className='text-[11px] text-zinc-400 mt-0.5 truncate'>{s.excerpt}</p>
+                            )}
+                          </Link>
                         ))}
+                        {m.sources.length > 3 && (
+                          <span className='text-[11px] text-zinc-400 pl-1'>+{m.sources.length - 3} more</span>
+                        )}
                       </div>
                     </div>
                   ) : null}
