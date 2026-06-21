@@ -14,8 +14,7 @@ export function Sidebar() {
   return (
     <aside className='w-56 shrink-0 flex flex-col' style={{ background: '#0D0D12' }}>
       <div className='px-5 py-4 flex items-center gap-2.5 border-b border-white/[0.06]'>
-        <span className='w-6 h-6 rounded-md flex items-center justify-center text-white text-xs font-bold'
-          style={{ background: 'linear-gradient(135deg, #534AB7, #1D9E75)' }}>R</span>
+        <img src='/logo.svg' alt='Recall' className='w-8 h-8 rounded-lg' />
         <span className='text-white font-semibold tracking-tight text-[15px]'>Recall</span>
       </div>
 

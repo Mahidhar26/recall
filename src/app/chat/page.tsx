@@ -1,12 +1,25 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
+import { Markdown } from '@/components/Markdown'
 
 interface Message { role: 'user' | 'assistant'; content: string; sources?: any[] }
+type Phase = 'idle' | 'searching' | 'streaming'
 
-const SUGGESTIONS = [
+const BOT_NAME = 'Recall'
+
+const STARTER_SUGGESTIONS = [
   'What decisions were made this week?',
   'Who owns open action items?',
   'What did we decide about pricing?',
+]
+
+// Shown after an answer to keep the conversation moving.
+const FOLLOWUP_SUGGESTIONS = [
+  'Summarize the key takeaways',
+  'What are the next steps?',
+  'Which items are still blocked?',
+  'Who was involved in this?',
+  'When is this due?',
 ]
 
 export default function ChatPage() {
@@ -14,20 +27,33 @@ export default function ChatPage() {
     { role: 'assistant', content: 'Ask me anything about your indexed meetings — decisions, action items, or any discussion.' }
   ])
   const [input, setInput] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [phase, setPhase] = useState<Phase>('idle')
   const bottomRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
+  const loading = phase !== 'idle'
 
-  // Show suggestion chips only before the user has asked anything.
-  const showSuggestions = messages.length === 1
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, phase])
+  useEffect(() => { if (!loading) inputRef.current?.focus() }, [loading])
+
+  const last = messages[messages.length - 1]
+  const showStarters = messages.length === 1
+  // Offer follow-ups once a real answer has streamed in and we're idle.
+  const showFollowups =
+    !loading && messages.length > 1 && last.role === 'assistant' && !!last.content
+
+  // Rotate follow-up chips so they don't feel static across turns.
+  const followups = (() => {
+    const offset = messages.length % FOLLOWUP_SUGGESTIONS.length
+    return [...FOLLOWUP_SUGGESTIONS.slice(offset), ...FOLLOWUP_SUGGESTIONS.slice(0, offset)].slice(0, 3)
+  })()
 
   async function send(text?: string) {
     const query = (text ?? input).trim()
     if (!query || loading) return
     setInput('')
     setMessages(prev => [...prev, { role: 'user', content: query }])
-    setLoading(true)
+    setPhase('searching')
 
     try {
       const res = await fetch('/api/chat', {
@@ -45,12 +71,14 @@ export default function ChatPage() {
       const reader = res.body?.getReader()
       const decoder = new TextDecoder()
       let text = ''
+      let started = false
 
       setMessages(prev => [...prev, { role: 'assistant', content: '', sources }])
 
       while (reader) {
         const { done, value } = await reader.read()
         if (done) break
+        if (!started) { started = true; setPhase('streaming') }
         text += decoder.decode(value)
         setMessages(prev => {
           const updated = [...prev]
@@ -61,69 +89,94 @@ export default function ChatPage() {
     } catch (err: any) {
       setMessages(prev => [...prev, { role: 'assistant', content: err?.message || 'Something went wrong. Please try again.' }])
     }
-    setLoading(false)
+    setPhase('idle')
   }
 
   return (
     <div className='flex flex-col h-full'>
-      {/* Header */}
-      <div className='px-6 py-4 border-b border-zinc-200 bg-white'>
-        <h1 className='text-[15px] font-semibold text-zinc-900 tracking-tight'>Ask anything</h1>
-        <p className='text-xs text-zinc-400 mt-0.5'>Answers are grounded in your indexed meetings</p>
+      {/* Header + progress bar */}
+      <div className='border-b border-zinc-200 bg-white'>
+        <div className='px-6 py-4 flex items-center gap-3'>
+          <BotAvatar />
+          <div>
+            <h1 className='text-[15px] font-semibold text-zinc-900 tracking-tight'>{BOT_NAME}</h1>
+            <p className='text-xs text-zinc-400'>Answers grounded in your indexed meetings</p>
+          </div>
+        </div>
+        <div className='h-0.5 relative overflow-hidden bg-transparent'>
+          {loading && <div className='recall-progress-bar absolute inset-0' />}
+        </div>
       </div>
 
       {/* Messages */}
       <div className='flex-1 overflow-auto px-6 py-6 space-y-5'>
         {messages.map((m, i) => (
-          <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            {m.role === 'assistant' ? (
-              <div className='max-w-[82%] border-l-2 pl-4' style={{ borderColor: '#534AB7' }}>
-                <div className='text-sm text-zinc-700 leading-relaxed whitespace-pre-wrap'>
-                  {m.content || <span className='text-zinc-300 italic'>Thinking…</span>}
-                </div>
-                {m.sources?.length ? (
-                  <div className='mt-3'>
-                    <div className='text-[10px] font-semibold uppercase tracking-widest text-zinc-400 mb-1.5'>Sources</div>
-                    <div className='flex flex-wrap gap-1.5'>
-                      {m.sources.map((s: any, j: number) => (
-                        <span key={j} className='text-[11px] px-2 py-0.5 rounded-full font-medium'
-                          style={{ background: '#F4F3FB', color: '#453C9E' }}>
-                          {s.title} · {s.date}
-                        </span>
-                      ))}
+          m.role === 'assistant' ? (
+            <div key={i} className='recall-rise flex gap-3'>
+              <BotAvatar />
+              <div className='flex-1 min-w-0'>
+                <div className='text-xs font-semibold text-zinc-700 mb-1'>{BOT_NAME}</div>
+                <div className='rounded-2xl rounded-tl-sm border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-700'>
+                  {m.content ? <Markdown content={m.content} /> : <TypingDots />}
+                  {m.sources?.length ? (
+                    <div className='mt-3 pt-3 border-t border-zinc-100'>
+                      <div className='text-[10px] font-semibold uppercase tracking-widest text-zinc-400 mb-1.5'>Sources</div>
+                      <div className='flex flex-wrap gap-1.5'>
+                        {m.sources.map((s: any, j: number) => (
+                          <span key={j} className='text-[11px] px-2 py-0.5 rounded-full font-medium'
+                            style={{ background: '#F4F3FB', color: '#453C9E' }}>
+                            {s.title} · {s.date}
+                          </span>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ) : null}
+                  ) : null}
+                </div>
               </div>
-            ) : (
-              <div className='max-w-[82%] px-4 py-2.5 rounded-2xl rounded-tr-sm text-sm leading-relaxed text-white'
-                style={{ background: '#534AB7' }}>
-                {m.content}
+            </div>
+          ) : (
+            <div key={i} className='recall-rise flex gap-3 justify-end'>
+              <div className='flex flex-col items-end min-w-0'>
+                <div className='text-xs font-semibold text-zinc-500 mb-1'>You</div>
+                <div className='max-w-full px-4 py-2.5 rounded-2xl rounded-tr-sm text-sm leading-relaxed text-white'
+                  style={{ background: '#534AB7' }}>
+                  {m.content}
+                </div>
               </div>
-            )}
-          </div>
+            </div>
+          )
         ))}
-        {showSuggestions && (
-          <div className='flex flex-wrap gap-2 pt-1'>
-            {SUGGESTIONS.map(q => (
-              <button
-                key={q}
-                onClick={() => send(q)}
-                className='text-xs px-3 py-1.5 rounded-full border border-zinc-200 text-zinc-600 bg-white hover:border-[#534AB7] hover:text-[#534AB7] transition-colors'
-              >
-                {q}
-              </button>
-            ))}
+
+        {/* Searching status (before first token) */}
+        {phase === 'searching' && (
+          <div className='recall-rise flex gap-3'>
+            <BotAvatar />
+            <div className='flex items-center gap-2 text-xs text-zinc-400 mt-6'>
+              <TypingDots />
+              <span>Recalling…</span>
+            </div>
           </div>
         )}
+
+        {/* Starter suggestions (empty chat) */}
+        {showStarters && (
+          <SuggestionRow label='Try asking' items={STARTER_SUGGESTIONS} onPick={send} />
+        )}
+
+        {/* Follow-up suggestions (after an answer) */}
+        {showFollowups && (
+          <SuggestionRow label='Ask a follow-up' items={followups} onPick={send} />
+        )}
+
         <div ref={bottomRef} />
       </div>
 
       {/* Input */}
       <div className='px-6 py-4 border-t border-zinc-200 bg-white flex gap-2'>
         <input
+          ref={inputRef}
           className='flex-1 border border-zinc-200 rounded-lg px-4 py-2.5 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:border-[#534AB7] focus:ring-1 focus:ring-[#534AB7] bg-zinc-50 disabled:opacity-50 transition-colors'
-          placeholder='Ask about any meeting, decision, or action item…'
+          placeholder={loading ? 'Recall is answering…' : 'Ask about any meeting, decision, or action item…'}
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && send()}
@@ -131,15 +184,55 @@ export default function ChatPage() {
         />
         <button
           onClick={() => send()}
-          disabled={loading}
-          className='px-5 py-2.5 text-sm font-medium text-white rounded-lg disabled:opacity-40 transition-colors'
+          disabled={loading || !input.trim()}
+          className='px-5 py-2.5 text-sm font-medium text-white rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors'
           style={{ background: '#534AB7' }}
-          onMouseEnter={e => !loading && (e.currentTarget.style.background = '#453C9E')}
+          onMouseEnter={e => !loading && input.trim() && (e.currentTarget.style.background = '#453C9E')}
           onMouseLeave={e => (e.currentTarget.style.background = '#534AB7')}
         >
           {loading ? '…' : 'Send'}
         </button>
       </div>
     </div>
+  )
+}
+
+function SuggestionRow({ label, items, onPick }: { label: string; items: string[]; onPick: (q: string) => void }) {
+  return (
+    <div className='recall-rise pt-1'>
+      <div className='text-[10px] font-semibold uppercase tracking-widest text-zinc-400 mb-2'>{label}</div>
+      <div className='flex flex-wrap gap-2'>
+        {items.map(q => (
+          <button
+            key={q}
+            onClick={() => onPick(q)}
+            className='text-xs px-3 py-1.5 rounded-full border border-zinc-200 text-zinc-600 bg-white hover:border-[#534AB7] hover:text-[#534AB7] transition-colors'
+          >
+            {q}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function BotAvatar() {
+  return (
+    <div
+      className='w-8 h-8 shrink-0 rounded-lg flex items-center justify-center text-white text-xs font-bold'
+      style={{ background: 'linear-gradient(135deg, #534AB7, #1D9E75)' }}
+    >
+      R
+    </div>
+  )
+}
+
+function TypingDots() {
+  return (
+    <span className='inline-flex items-center gap-1 align-middle'>
+      <span className='recall-dot w-1.5 h-1.5 rounded-full' style={{ background: '#534AB7' }} />
+      <span className='recall-dot w-1.5 h-1.5 rounded-full' style={{ background: '#534AB7' }} />
+      <span className='recall-dot w-1.5 h-1.5 rounded-full' style={{ background: '#534AB7' }} />
+    </span>
   )
 }
