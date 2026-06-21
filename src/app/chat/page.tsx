@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { Markdown } from '@/components/Markdown'
+import { Toast } from '@/components/Toast'
 
 interface Source { title: string; date: string; id: string; excerpt: string }
 interface Message { role: 'user' | 'assistant'; content: string; sources?: Source[] }
@@ -32,6 +33,19 @@ export default function ChatPage() {
   const [phase, setPhase] = useState<Phase>('idle')
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const [toastVisible, setToastVisible] = useState(false)
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function handleCopy(answerIndex: number) {
+    const answer = messages[answerIndex]
+    const question = messages[answerIndex - 1]
+    const plainAnswer = answer.content.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/\*([^*]+)\*/g, '$1').replace(/`([^`]+)`/g, '$1')
+    const text = `Q: ${question?.content ?? ''}\nA: ${plainAnswer}\n\n— via Recall`
+    navigator.clipboard.writeText(text)
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+    setToastVisible(true)
+    toastTimer.current = setTimeout(() => setToastVisible(false), 2000)
+  }
 
   const loading = phase !== 'idle'
 
@@ -117,7 +131,18 @@ export default function ChatPage() {
             <div key={i} className='recall-rise flex gap-3'>
               <BotAvatar />
               <div className='flex-1 min-w-0'>
-                <div className='text-xs font-semibold text-zinc-700 mb-1'>{BOT_NAME}</div>
+                <div className='flex items-center justify-between mb-1'>
+                  <div className='text-xs font-semibold text-zinc-700'>{BOT_NAME}</div>
+                  {m.content && i > 0 && (
+                    <button
+                      onClick={() => handleCopy(i)}
+                      title='Copy answer'
+                      className='text-zinc-300 hover:text-[#534AB7] transition-colors text-[13px] leading-none'
+                    >
+                      ⎘
+                    </button>
+                  )}
+                </div>
                 <div className='rounded-2xl rounded-tl-sm border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-700'>
                   {m.content ? <Markdown content={m.content} /> : <TypingDots />}
                   {m.sources?.length ? (
@@ -209,6 +234,7 @@ export default function ChatPage() {
           {loading ? '…' : 'Send'}
         </button>
       </div>
+      <Toast message='Copied!' visible={toastVisible} />
     </div>
   )
 }
