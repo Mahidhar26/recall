@@ -1,8 +1,16 @@
 'use client'
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 
-const STEPS = ['Parsing', 'Chunking', 'Embedding', 'Extracting']
+const STEPS = [
+  'Parsing file',
+  'Creating chunks',
+  'Generating embeddings',
+  'Extracting actions',
+  'Extracting decisions',
+  'Done',
+]
+const STEP_DELAYS = [0, 1500, 3000, 6000, 9000, 12000]
 
 export default function OverviewPage() {
   const [data, setData] = useState<any>(null)
@@ -11,7 +19,6 @@ export default function OverviewPage() {
   const [dragging, setDragging] = useState(false)
   const [step, setStep] = useState(0)
   const [search, setSearch] = useState('')
-  const stepTimer = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const loadData = useCallback(async () => {
     const res = await fetch('/api/meetings')
@@ -22,10 +29,12 @@ export default function OverviewPage() {
 
   async function handleUpload(file: File) {
     setUploading(true); setUploadResult(null); setStep(0)
-    // Advance through pipeline steps for live feedback while the API works.
-    stepTimer.current = setInterval(() => {
-      setStep(s => Math.min(s + 1, STEPS.length - 1))
-    }, 2500)
+
+    // Schedule each step at its fixed offset
+    const timers: ReturnType<typeof setTimeout>[] = []
+    STEP_DELAYS.slice(1).forEach((delay, i) => {
+      timers.push(setTimeout(() => setStep(i + 1), delay))
+    })
 
     const form = new FormData()
     form.append('file', file)
@@ -33,10 +42,11 @@ export default function OverviewPage() {
       const res = await fetch('/api/upload', { method: 'POST', body: form })
       const json = await res.json()
       setUploadResult(json)
+      setStep(STEPS.length - 1) // jump to Done on success
       loadData()
     } catch { setUploadResult({ error: 'Upload failed' }) }
     finally {
-      if (stepTimer.current) clearInterval(stepTimer.current)
+      timers.forEach(clearTimeout)
       setUploading(false)
     }
   }
@@ -157,34 +167,53 @@ export default function OverviewPage() {
 
 function UploadProgress({ step }: { step: number }) {
   return (
-    <div className='space-y-4'>
-      <div className='text-sm font-medium text-zinc-600'>Processing transcript…</div>
-      <div className='flex items-center justify-center gap-2'>
-        {STEPS.map((label, i) => {
-          const done = i < step
-          const active = i === step
-          return (
-            <div key={label} className='flex items-center gap-2'>
-              <div className='flex items-center gap-1.5'>
-                <span
-                  className='w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold transition-colors'
-                  style={{
-                    background: done ? '#1D9E75' : active ? '#534AB7' : '#E4E4E7',
-                    color: done || active ? '#fff' : '#A1A1AA',
-                  }}
-                >
-                  {done ? '✓' : i + 1}
-                </span>
-                <span className='text-xs font-medium' style={{ color: done ? '#1D9E75' : active ? '#534AB7' : '#A1A1AA' }}>
-                  {label}
-                </span>
+    <div className='flex flex-col items-start gap-0 text-left max-w-xs mx-auto'>
+      {STEPS.map((label, i) => {
+        const done = i < step
+        const active = i === step
+        const pending = i > step
+        return (
+          <div key={label} className='flex items-start gap-3'>
+            {/* Connector line + dot column */}
+            <div className='flex flex-col items-center'>
+              <div className='relative w-6 h-6 flex items-center justify-center'>
+                {active ? (
+                  <div
+                    className='recall-spin w-5 h-5 rounded-full'
+                    style={{
+                      background: 'conic-gradient(from 0deg, #534AB7, #1D9E75, transparent 75%)',
+                      WebkitMask: 'radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 0)',
+                      mask: 'radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 0)',
+                    }}
+                  />
+                ) : (
+                  <div
+                    className='w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold transition-colors'
+                    style={{
+                      background: done ? '#1D9E75' : '#E4E4E7',
+                      color: done ? '#fff' : '#A1A1AA',
+                    }}
+                  >
+                    {done ? '✓' : ''}
+                  </div>
+                )}
               </div>
-              {i < STEPS.length - 1 && <span className='text-zinc-300 text-xs'>›</span>}
+              {i < STEPS.length - 1 && (
+                <div className='w-px h-5' style={{ background: done ? '#1D9E75' : '#E4E4E7' }} />
+              )}
             </div>
-          )
-        })}
-      </div>
-      <div className='text-xs text-zinc-300'>This takes 10–30 seconds</div>
+            {/* Label */}
+            <div className='pb-5 pt-0.5'>
+              <span
+                className='text-sm font-medium transition-colors'
+                style={{ color: done ? '#1D9E75' : active ? '#534AB7' : '#A1A1AA' }}
+              >
+                {label}
+              </span>
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
