@@ -96,7 +96,15 @@ export default function ChatPage() {
         return updated
       })
     } catch (err: any) {
-      setMessages(prev => [...prev, { role: 'assistant', content: err?.message || 'Something went wrong. Please try again.' }])
+      setMessages(prev => {
+        const updated = [...prev]
+        const last = updated[updated.length - 1]
+        if (last?.role === 'assistant') {
+          updated[updated.length - 1] = { role: 'assistant', content: err?.message || 'Something went wrong. Please try again.' }
+          return updated
+        }
+        return [...prev, { role: 'assistant', content: err?.message || 'Something went wrong. Please try again.' }]
+      })
     }
     setPhase('idle')
   }
